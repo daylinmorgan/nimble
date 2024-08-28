@@ -527,18 +527,18 @@ proc installFromDir(dir: string, requestedVer: VersionRange, options: Options,
   # Build before removing an existing package (if one exists). This way
   # if the build fails then the old package will still be installed.
 
-  if pkgInfo.bin.len > 0 and not isNimPackage:
-    let paths = result.deps.map(dep => dep.expandPaths(options))
-    let flags = if options.action.typ in {actionInstall, actionPath, actionUninstall, actionDevelop}:
-                  options.action.passNimFlags
-                else:
-                  @[]
-
-    try:
-      buildFromDir(pkgInfo, paths, "-d:release" & flags, options)
-    except CatchableError:
-      removeRevDep(options.nimbleData, pkgInfo)
-      raise
+  # if pkgInfo.bin.len > 0 and not isNimPackage:
+  #   let paths = result.deps.map(dep => dep.expandPaths(options))
+  #   let flags = if options.action.typ in {actionInstall, actionPath, actionUninstall, actionDevelop}:
+  #                 options.action.passNimFlags
+  #               else:
+  #                 @[]
+  #
+  #   try:
+  #     buildFromDir(pkgInfo, paths, "-d:release" & flags, options)
+  #   except CatchableError:
+  #     removeRevDep(options.nimbleData, pkgInfo)
+  #     raise
 
   let pkgDestDir = pkgInfo.getPkgDest(options)
 
