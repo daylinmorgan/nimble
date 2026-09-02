@@ -67,9 +67,9 @@ const ActivationFile =
 
 proc infoAboutActivation(nimDest, nimVersion: string) =
   when defined(windows):
-    display("Info", nimDest & "installed; activate with 'nim-" & nimVersion & "activate.bat'")
+    notice nimDest & "installed; activate with 'nim-" & nimVersion & "activate.bat'"
   else:
-    display("Info", nimDest & "installed; activate with 'source nim-" & nimVersion & "activate.sh'")
+    notice nimDest & "installed; activate with 'source nim-" & nimVersion & "activate.sh'"
 
 proc compileNim*(options: Options, nimDest: string, v: VersionRange) {.async.} =
   #Most of the time we dont need to recompile, if we can get the nim version from the binary . 
@@ -81,14 +81,14 @@ proc compileNim*(options: Options, nimDest: string, v: VersionRange) {.async.} =
   template exec(command: string) =
     let cmd = command # eval once
     if os.execShellCmd(cmd) != 0:
-      display("Error", "Failed to execute: $1" % cmd, Error, HighPriority)
+      error "Failed to execute: $1" % cmd
       return
   let nimVersion = v.getNimVersion()
   let canUseCsources = v.kind != verAny
   let workspace = nimDest.parentDir()
   if dirExists(workspace / nimDest):
     if not fileExists(nimDest / ActivationFile):
-      display("Info", &"Directory {nimDest} already exists; remove or rename and try again")
+      notice &"Directory {nimDest} already exists; remove or rename and try again"
     else:
       infoAboutActivation nimDest, $nimVersion
     return
@@ -96,7 +96,7 @@ proc compileNim*(options: Options, nimDest: string, v: VersionRange) {.async.} =
   var major, minor, patch: int
   if not nimVersion.isSpecial: 
     if not scanf($nimVersion, "$i.$i.$i", major, minor, patch):
-      display("Error", "cannot parse version requirement", Error)
+      error "cannot parse version requirement"
       return
   # Authoritative csources info from Nim's own `config/build_config.txt`
   # at the matching tag. Pinning to the recorded commit is required for
@@ -150,7 +150,7 @@ proc compileNim*(options: Options, nimDest: string, v: VersionRange) {.async.} =
   cd nimDest:
     #Sometimes building from csources fails and we cant do much about it. So we fallback to the slow build_all method
     if not csourcesSucceed:
-      display("Warning", "Building nim from csources failed. Using `build_all`", Warning, HighPriority)
+      warn "Building nim from csources failed. Using `build_all`"
       let cmd = 
         when defined(windows):  "build_all.bat" 
         else: "sh build_all.sh"
@@ -196,6 +196,10 @@ proc useNimFromDir*(options: var Options, realDir: string, v: VersionRange, tryC
 
   putEnv("PATH", realDir / "bin" & separator & getEnv("PATH"))
   if fileExists:
-    display("Info:", "switching to $1 for compilation" % options.nim, priority = HighPriority)
+    notice "switching to $1 for compilation" % options.nim
   else:
-    display("Info:", "using $1 for compilation" % options.nim, priority = HighPriority)
+    notice "using $1 for compilation" % options.nim
+
+
+
+

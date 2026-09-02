@@ -72,7 +72,7 @@ proc loadMetaData*(dirName: string, raiseIfNotFound: bool, options: Options): Pa
     if dirName.isSubdirOf(options.getPkgsDir()) and not dirName.isSubdirOf(options.nimBinariesDir):
       #dont show warning for global package install
       if findNimbleFile(dirName, error = false, options, warn = false) != "":
-        displayWarning(&"No {packageMetaDataFileName} file found in {dirName}")
+        warn &"No {packageMetaDataFileName} file found in {dirName}"
 
 proc fillMetaData*(packageInfo: var PackageInfo, dirName: string,
                    raiseIfNotFound: bool, options: Options) =

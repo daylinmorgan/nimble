@@ -147,7 +147,7 @@ proc save*(data: DevelopFileData, path: Path, writeEmpty, overwrite: bool) =
     raise nimbleError(fileAlreadyExistsMsg($path))
 
   writeFile(path, json.pretty)
-  displaySuccess(developFileSavedMsg($path), priority = DebugPriority)
+  debug developFileSavedMsg($path)
 
 proc developFileExists*(dir: Path): bool =
   ## Returns `true` if there is a Nimble develop file with a default name in
@@ -426,8 +426,7 @@ proc addDevelopPackage(data: var DevelopFileData, pkg: PackageInfo): bool =
   # `pkg.name` at different path.
   if data.nameToPkg.hasKey(pkg.basicInfo.name) and not data.pathToPkg.hasKey(pkgDir):
     let otherPath = data.nameToPkg[pkg.basicInfo.name][].getNimbleFilePath()
-    displayError(pkgAlreadyPresentAtDifferentPathMsg(
-      pkg.basicInfo.name, $otherPath, $data.path))
+    error pkgAlreadyPresentAtDifferentPathMsg(pkg.basicInfo.name, $otherPath, $data.path)
     return false
 
   # Add `pkg` to the develop file model.
@@ -439,11 +438,9 @@ proc addDevelopPackage(data: var DevelopFileData, pkg: PackageInfo): bool =
                                   "path different than already existing one."
 
   if success:
-    displaySuccess(pkgAddedInDevFileMsg(
-      pkg.getNameAndVersion, $pkgDir, $data.path))
+    notice(pkgAddedInDevFileMsg(pkg.getNameAndVersion, $pkgDir, $data.path))
   else:
-    displayWarning(pkgAlreadyInDevFileMsg(
-      pkg.getNameAndVersion, $pkgDir, $data.path))
+    warn(pkgAlreadyInDevFileMsg(pkg.getNameAndVersion, $pkgDir, $data.path))
 
   return true
 
@@ -463,8 +460,8 @@ proc addDevelopPackage(data: var DevelopFileData, path: Path,
 
   let (pkgInfo, error) = validatePackage(path, options, nimBin)
   if error != nil:
-    displayError(invalidPkgMsg($path))
-    displayDetails(error)
+    error invalidPkgMsg($path)
+    error error
     return false
 
   return addDevelopPackage(data, pkgInfo)
@@ -538,9 +535,9 @@ proc removeDevelopPackageByPath(data: var DevelopFileData, path: Path): bool =
   if success:
     let nameAndVersion = data.pathToPkg[path][].getNameAndVersion()
     data.removePackage(path, data.path)
-    displaySuccess(pkgRemovedFromDevFileMsg(nameAndVersion, $path, $data.path))
+    notice pkgRemovedFromDevFileMsg(nameAndVersion, $path, $data.path)
   else:
-    displayWarning(pkgPathNotInDevFileMsg($path, $data.path))
+    warn pkgPathNotInDevFileMsg($path, $data.path)
 
   return success
 
@@ -559,10 +556,9 @@ proc removeDevelopPackageByName(data: var DevelopFileData, name: string): bool =
 
   if success:
     data.removePackage(path, data.path)
-    displaySuccess(pkgRemovedFromDevFileMsg(
-      pkg[].getNameAndVersion, $path, $data.path))
+    notice pkgRemovedFromDevFileMsg(pkg[].getNameAndVersion, $path, $data.path)
   else:
-    displayWarning(pkgNameNotInDevFileMsg(name, $data.path))
+    warn pkgNameNotInDevFileMsg(name, $data.path)
 
   return success
 
@@ -586,8 +582,8 @@ proc includeDevelopFile(cache: var DevelopCache, data: var DevelopFileData, path
   try:
     inclFileData = load(cache, path, initPackageInfo(), options, false, true, nimBin)
   except CatchableError as error:
-    displayError(failedToLoadFileMsg($path))
-    displayDetails(error)
+    error failedToLoadFileMsg($path)
+    error error
     return false
 
   let success = not data.jsonData.includes.containsOrIncl(path)
@@ -596,17 +592,17 @@ proc includeDevelopFile(cache: var DevelopCache, data: var DevelopFileData, path
     var errors: ErrorsCollection
     data.mergeIncludedDevFileData(inclFileData, errors)
     if errors.hasErrors:
-      displayError(failedToInclInDevFileMsg($path, $data.path))
-      displayDetails(errors.getErrorsDetails)
+      error failedToInclInDevFileMsg($path, $data.path)
+      error errors.getErrorsDetails
       # Revert the inclusion in the case of merge errors.
       data.jsonData.includes.excl(path)
       for pkgPath, _ in inclFileData.pathToPkg:
         data.removePackage(pkgPath, path)
       return false
 
-    displaySuccess(inclInDevFileMsg($path, $data.path))
+    notice inclInDevFileMsg($path, $data.path)
   else:
-    displayWarning(alreadyInclInDevFileMsg($path, $data.path))
+    warn alreadyInclInDevFileMsg($path, $data.path)
 
   return true
 
@@ -633,9 +629,9 @@ proc excludeDevelopFile(data: var DevelopFileData, path: Path): bool =
     for pkg in packages:
       data.removePackage(pkg, path)
 
-    displaySuccess(exclFromDevFileMsg($path, $data.path))
+    notice exclFromDevFileMsg($path, $data.path)
   else:
-    displayWarning(notInclInDevFileMsg($path, $data.path))
+    warn notInclInDevFileMsg($path, $data.path)
 
   return success
 

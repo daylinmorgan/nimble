@@ -17,8 +17,7 @@ proc writeExampleIfNonExistent(file: string, content: string) =
   if not fileExists(file):
     writeFile(file, content)
   else:
-    display("Info:", "File " & file & " already exists, did not write " &
-            "example code", priority = HighPriority)
+    notice "File ", file, " already exists, did not write example code"
 
 proc createPkgStructure*(info: PkgInitInfo, pkgRoot: string) =
   # Create source directory
@@ -175,4 +174,4 @@ requires "nim >= $#"
     ]
   )
 
-  display("Info:", "Nimble file created successfully", priority=MediumPriority)
+  info "Nimble file created successfully"

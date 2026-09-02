@@ -537,7 +537,7 @@ proc getPkgBuildTempDir*(options: Options, pkgName: string, version: string, che
 proc setPackageCache(options: var Options, baseDir: string) =
   options.pkgCachePath = baseDir / "pkgcache"
   if options.verbosity >= LowPriority:
-    display("Info:", "Package cache path " & options.pkgCachePath, priority = LowPriority)
+    debug "Package cache path " & options.pkgCachePath
 
 proc isSubdirOf*(subdir, baseDir: string): bool =
   let
@@ -581,7 +581,7 @@ proc findNimbleFile*(dir: string; error: bool, options: Options, warn = true): s
         "directory: $1" % dir)
     else:
       if not dir.isSubdirOf(options.nimBinariesDir) and warn:
-        displayWarning(&"No .nimble file found for {dir}")
+        warn &"No .nimble file found for {dir}"
 
 proc thereIsNimbleFile*(options: Options): bool =
   ## Returns true when the current working directory contains a .nimble file.
@@ -635,8 +635,7 @@ proc setNimbleDir*(options: var Options) =
     # ...followed by the environment variable.
     let env = getEnv("NIMBLE_DIR")
     if env.len != 0:
-      display("Info:", "Using the environment variable: NIMBLE_DIR='" &
-              env & "'", DisplayType.Success, priority = HighPriority)
+      info &"Using the environment variable: NIMBLE_DIR='{env}'"
       nimbleDir = env
       setPackageCache(options, options.config.nimbleDir) #Use the global nimbleDir so pkgcache is shared
     else:
@@ -1140,8 +1139,7 @@ proc getProxyUrl*(proxyConfig = ""): Opt[string] =
       else:
         Opt.none(string)
     except ValueError:
-      display("Warning:", "Unable to parse proxy from environment: " &
-          getCurrentExceptionMsg(), Warning, HighPriority)
+      warn "Unable to parse proxy from environment: " & getCurrentExceptionMsg()
       Opt.none(string)
 
 proc getProvider*(configProxy = ""): HttpConnectionProvider =
@@ -1158,8 +1156,7 @@ proc getProvider*(configProxy = ""): HttpConnectionProvider =
 proc shouldRemoveTmp*(options: Options, file: string): bool =
   result = true
   if options.verbosity <= DebugPriority:
-    let msg = "Not removing temporary path because of debug verbosity: " & file
-    display("Warning:", msg, Warning, MediumPriority)
+    warn "Not removing temporary path because of debug verbosity: " & file
     return false
 
 proc getCompilationFlags*(options: var Options): var seq[string] =

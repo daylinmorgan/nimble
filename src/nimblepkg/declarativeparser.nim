@@ -711,7 +711,7 @@ proc toRequiresInfo*(pkgInfo: PackageInfo, options: Options, nimBin: Option[stri
 
   if pkgInfo.myPath.splitFile.ext == ".babel":
     let msg = &"Package '{pkgInfo.basicInfo.name}' version {pkgInfo.basicInfo.version} uses the unsupported .babel format — skipping. Migrate to a .nimble file."
-    display("Warning", msg, Warning, HighPriority)
+    warn msg
     raise newNimbleError[BabelPackageError](msg)
 
   let nimbleFileInfo = nimbleFileInfo.get(extractRequiresInfo(pkgInfo.myPath, options))
@@ -726,7 +726,7 @@ proc toRequiresInfo*(pkgInfo: PackageInfo, options: Options, nimBin: Option[stri
 
     if options.verbosity <= LowPriority:
       for line in nimbleFileInfo.declarativeParserErrorLines:
-        displayWarning line
+        warn line
 
     result = getPkgInfoMaybeInTempDir(result.myPath.parentDir, options, resolvedBin, result.myPath)
     for line in nimbleFileInfo.declarativeParserErrorLines:

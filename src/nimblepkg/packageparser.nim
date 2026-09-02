@@ -124,11 +124,10 @@ proc validatePackageInfo(pkgInfo: PackageInfo, options: Options) =
 
 proc nimScriptHint*(pkgInfo: PackageInfo) =
   if not pkgInfo.isNimScript:
-    display("Warning:", "The .nimble file for this project could make use of " &
-            "additional features, if converted into the new NimScript format." &
-            "\nFor more details see:" &
-            "https://github.com/nim-lang/nimble#creating-packages",
-            Warning, HighPriority)
+    warn("The .nimble file for this project could make use of " &
+          "additional features, if converted into the new NimScript format." &
+          "\nFor more details see:" &
+          "https://github.com/nim-lang/nimble#creating-packages")
 
 proc multiSplit(s: string): seq[string] =
   ## Returns ``s`` split by newline and comma characters.
@@ -383,8 +382,8 @@ proc getPkgInfoFromFile*(nimBin: Option[string],file: NimbleFile, options: Optio
     readPackageInfo(result, file, options, nimBin, onlyMinimalInfo = onlyMinimalInfo, useCache= useCache)
   except ValidationError as exc:
     if exc.warnAll and not forValidation:
-      display("Warning:", exc.msg, Warning, HighPriority)
-      display("Hint:", exc.hint, Warning, HighPriority)
+      warn exc.msg
+      warn exc.hint
     else:
       raise exc
 
@@ -413,7 +412,7 @@ proc getInstalledPkgs*(nimBin: Option[string], libsDir: string, options: Options
         $version
     return tmplt % [name, fullVersion, msg]
 
-  display("Loading", "list of installed packages", priority = MediumPriority)
+  info "Loading list of installed packages"
 
   result = @[]
   for kind, path in walkDir(libsDir):
@@ -429,7 +428,7 @@ proc getInstalledPkgs*(nimBin: Option[string], libsDir: string, options: Options
           exc.msg = createErrorMsg(validationErrorMsg, path, exc.msg)
           exc.hint = hintMsg % path
           if exc.warnInstalled or exc.warnAll:
-            display("Warning:", exc.msg, Warning, HighPriority)
+            warn exc.msg
             # Don't show hints here because they are only useful for package
             # owners.
           else:

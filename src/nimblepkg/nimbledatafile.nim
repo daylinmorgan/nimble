@@ -24,7 +24,7 @@ proc saveNimbleData(filePath: string, nimbleData: JsonNode) =
   # TODO: This file should probably be locked.
   if isNimbleDataFileLoaded:
     writeFile(filePath, nimbleData.pretty)
-    displayInfo(&"Nimble data file \"{filePath}\" has been saved.", LowPriority)
+    debug &"Nimble data file \"{filePath}\" has been saved."
 
 proc saveNimbleDataToDir(nimbleDir: string, nimbleData: JsonNode) =
   saveNimbleData(nimbleDir / nimbleDataFileName, nimbleData)
@@ -57,11 +57,9 @@ proc loadNimbleData*(options: var Options) =
   if fileExists(fileName):
     options.nimbleData = parseFile(fileName)
     removeDeadDevelopReverseDeps(options)
-    displayInfo(&"Nimble data file \"{fileName}\" has been loaded.",
-                LowPriority)
+    debug &"Nimble data file \"{fileName}\" has been loaded."
   else:
-    displayWarning(&"Nimble data file \"{fileName}\" is not found.",
-                   LowPriority)
+    warn &"Nimble data file \"{fileName}\" is not found."
     options.nimbleData = newNimbleDataNode()
 
   isNimbleDataFileLoaded = true

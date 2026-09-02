@@ -112,7 +112,7 @@ proc topologicalSort*(graph: LockFileDeps):
     let message = cycles.foldl(
       a & "\nCycle detected: " & b.foldl(&"{a} -> {b}"),
       "The dependency graph is not a DAG.")
-    display("Warning", message, Warning, HighPriority)
+    warn message
 
   var sortedNames = graph.keys.toSeq
   sortedNames.sort(cmp)

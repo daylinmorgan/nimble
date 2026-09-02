@@ -43,7 +43,7 @@ proc parseConfig*(): Config =
 
   var f = newFileStream(confFile, fmRead)
   if f != nil:
-    display("Reading", "config file at " & confFile, priority = LowPriority)
+    debug "Reading config file at " & confFile
     var p: CfgParser
     open(p, f, confFile)
     var currentSection = ""

@@ -36,21 +36,19 @@ proc createHeaders(a: var Auth) =
   }
 
 proc requestNewToken(cfg: Config): string =
-  display("Info:", "Please create a new personal access token on GitHub in" &
-          " order to allow Nimble to fork the packages repository.",
-          priority = HighPriority)
-  display("Hint:", "Make sure to give the access token access to public repos and workflows" &
-          " (public_repo and workflow scopes)!", Warning, HighPriority)
+  notice("Please create a new personal access token on GitHub in" &
+          " order to allow Nimble to fork the packages repository.")
+  notice("Hint: Make sure to give the access token access to public repos and workflows" &
+          " (public_repo and workflow scopes)!")
   sleep(5000)
-  display("Info:", "Your default browser should open with the following URL: " &
-          "https://github.com/settings/tokens/new", priority = HighPriority)
+  notice("Your default browser should open with the following URL: " &
+          "https://github.com/settings/tokens/new")
   sleep(3000)
   openDefaultBrowser("https://github.com/settings/tokens/new")
   let token = promptCustom("Personal access token?", "").strip()
   # inform the user that their token will be written to disk
   let tokenWritePath = cfg.nimbleDir / ApiKeyFile
-  display("Info:", "Writing access token to file:" & tokenWritePath,
-          priority = HighPriority)
+  notice "Writing access token to file:" & tokenWritePath
   writeFile(tokenWritePath, token)
   sleep(3000)
   return token
@@ -71,16 +69,13 @@ proc getGithubAuth(o: Options): Auth =
   # always prefer the environment variable to asking for a new one
   if existsEnv(ApiTokenEnvironmentVariable):
     result.token = getEnv(ApiTokenEnvironmentVariable)
-    display("Info:", "Using the '" & ApiTokenEnvironmentVariable &
-            "' environment variable for the GitHub API Token.",
-            priority = HighPriority)
+    notice "Using the '", ApiTokenEnvironmentVariable, "' environment variable for the GitHub API Token."
   else:
     # try to read from disk, if it cannot be found write a new one
     try:
       let apiTokenFilePath = cfg.nimbleDir / ApiKeyFile
       result.token = readFile(apiTokenFilePath).strip()
-      display("Info:", "Using GitHub API Token in file: " & apiTokenFilePath,
-              priority = HighPriority)
+      notice "Using GitHub API Token in file: ", apiTokenFilePath
     except IOError:
       result.token = requestNewToken(cfg)
   createHeaders(result)
@@ -93,7 +88,7 @@ proc getGithubAuth(o: Options): Auth =
     respData = parseJson(bytesToString(waitFor resp.getBodyBytes()))
 
   result.user = respData["login"].str
-  display("Success:", "Verified as " & result.user, DisplayType.Success, HighPriority)
+  notice "Success: Verified as " & result.user
 
 proc isCorrectFork(j: JsonNode): bool =
   # Check whether this is a fork of the nimble packages repo.
@@ -132,7 +127,7 @@ proc createFork(a: Auth) =
                        " might not have enough permissions.")
 
 proc createPullRequest(a: Auth, pkg: PackageInfo, url, branch: string): string =
-  display("Info", "Creating PR", priority = HighPriority)
+  notice "Creating PR"
   let payload = %* {
       "title": &"Add package {pkg.basicInfo.name}",
       "head": &"{a.user}:{branch}",
@@ -260,27 +255,25 @@ proc publish*(p: PackageInfo, o: Options) =
   var pkgsDir = getNimbleUserTempDir() / "nimble-packages-fork"
   if not forkExists(auth):
     createFork(auth)
-    display("Info:", "Waiting 10s to let GitHub create a fork",
-            priority = HighPriority)
+    notice "Waiting 10s to let GitHub create a fork"
     os.sleep(10_000)
 
-    display("Info:", "Finished waiting", priority = LowPriority)
+    notice "Finished waiting"
   if dirExists(pkgsDir):
-    display("Removing", "old packages fork git directory.",
-            priority = LowPriority)
+    debug "Removing old packages fork git directory."
     removeDir(pkgsDir)
   createDir(pkgsDir)
   cd pkgsDir:
     # Avoid git clone to prevent token from being stored in repo
     # https://github.com/blog/1270-easier-builds-and-deployments-using-git-over-https-and-oauth
-    display("Copying", "packages fork into: " & pkgsDir, priority = HighPriority)
+    notice "Copying packages fork into: " & pkgsDir
     doCmd("git init")
     # The repo will have 0 branches created at this point. So the
     # below command will always work.
     doCmd("git checkout -b " & defaultBranch)
     doCmd("git pull https://github.com/" & auth.user & "/packages")
     # Make sure to update the fork
-    display("Updating", "the fork", priority = HighPriority)
+    notice "Updating the fork"
     doCmd("git pull https://github.com/nim-lang/packages.git " & defaultBranch)
     doCmd("git push https://" & auth.token & "@github.com/" & auth.user & "/packages " & defaultBranch)
 
@@ -297,8 +290,8 @@ proc publish*(p: PackageInfo, o: Options) =
     let branchName = "add-" & p.basicInfo.name & getTime().utc.format("HHmm")
     doCmd("git checkout -B " & branchName)
     doCmd("git commit packages.json -m \"Added package " & p.basicInfo.name & "\"")
-    display("Pushing", "to remote of fork.", priority = HighPriority)
+    notice "Pushing to remote of fork."
     doCmd("git push https://" & auth.token & "@github.com/" & auth.user & "/packages " & branchName)
     let prUrl = createPullRequest(auth, p, url, branchName)
-    display("Success:", "Pull request successful, check at " & prUrl , DisplayType.Success, HighPriority)
+    notice "Success: Pull request successful, check at " & prUrl
   waitFor auth.session.closeWait()

@@ -46,8 +46,7 @@ proc execCustom*(nimBin: Option[string], nimbleFile: string, options: Options,
                              [options.action.command, nimbleFile])
 
   if execResult.command.normalize == "nop":
-    display("Warning:", "Using `setCommand 'nop'` is not necessary.", Warning,
-            HighPriority)
+    warn "Using `setCommand 'nop'` is not necessary."
 
   if not execHook(nimBin, options, actionCustom, false):
     return

@@ -120,13 +120,12 @@ proc validatePackagesList(path: string): bool =
   ## Determines whether package list at ``path`` is valid.
   try:
     if not path.fileExists:
-      display("Warning:", path & " does not exist.", Warning, HighPriority)
+      warn path, " does not exist."
       return false
     let pkgList = parseFile(path)
     if pkgList.kind == JArray:
       if pkgList.len == 0:
-        display("Warning:", path & " contains no packages.", Warning,
-                HighPriority)
+        warn path, " contains no packages."
       return true
   except ValueError, JsonParsingError:
     return false
@@ -134,7 +133,7 @@ proc validatePackagesList(path: string): bool =
 proc fetchList*(list: PackageList, options: Options) {.async.} =
   ## Downloads or copies the specified package list and saves it in $nimbleDir.
   let verb = if list.urls.len > 0: "Downloading" else: "Copying"
-  display(verb, list.name & " package list", priority = HighPriority)
+  notice &"{verb} {list.name} package list"
 
   var
     lastError = ""
@@ -142,7 +141,7 @@ proc fetchList*(list: PackageList, options: Options) {.async.} =
   if list.urls.len > 0:
     for i in 0 ..< list.urls.len:
       let url = list.urls[i]
-      display("Trying", url)
+      notice "Trying ", url
       let tempPath = options.getNimbleDir() / "packages_temp.json"
 
       # Grab the proxy
@@ -150,8 +149,7 @@ proc fetchList*(list: PackageList, options: Options) {.async.} =
       if proxyUrl.isSome:
         var maskedUrl = parseUri(proxyUrl.get())
         if maskedUrl.password.len > 0: maskedUrl.password = "***"
-        display("Connecting", "to proxy at " & $maskedUrl,
-                priority = LowPriority)
+        debug "Connecting: to proxy at " & $maskedUrl
 
       let
         flags = if options.disableSslCertCheck:
@@ -183,32 +181,31 @@ proc fetchList*(list: PackageList, options: Options) {.async.} =
         raise nimbleError(message, "Use --noSSLCheck to ignore this error.")
 
       except:
-        let message = "Could not download: " & getCurrentExceptionMsg()
-        display("Warning:", message, Warning)
-        lastError = message
+        lastError = "Could not download: " & getCurrentExceptionMsg()
+        warn lastError
         continue
 
       if not validatePackagesList(tempPath):
         lastError = "Downloaded packages.json file is invalid"
-        display("Warning:", lastError & ", discarding.", Warning)
+        warn lastError, ", discaring."
         continue
 
       copyFromPath = tempPath
-      display("Success", "Package list downloaded.", DisplayType.Success, HighPriority)
+      notice "Success: Package list downloaded."
       lastError = ""
       break
 
   elif list.path != "":
     if not validatePackagesList(list.path):
       lastError = "Copied packages.json file is invalid"
-      display("Warning:", lastError & ", discarding.", Warning)
+      warn lastError, ", discaring."
     else:
       copyFromPath = list.path
-      display("Success", "Package list copied.", DisplayType.Success, HighPriority)
+      notice "Success: Package list copied."
 
   if lastError.len != 0:
     if list.name == "local":
-      display("Warning:", lastError & ", discarding.", Warning)
+      warn lastError, ", discaring."
     else:
       raise nimbleError("Refresh failed\n" & lastError)
 
@@ -230,7 +227,7 @@ proc readPackageList(name: string, options: Options, ignorePackageCache = false)
   if (not ignorePackageCache) and getGPackageJson().hasKey(name):
     return getGPackageJson()[name]
 
-  display("Reading", "$1 package list" % name, priority = LowPriority)
+  debug "Reading ", name, " package list"
 
   if needsRefresh(options):
     if options.prompt("No local packages.json found, download it from " &
@@ -254,8 +251,7 @@ proc resolveAlias(pkg: Package, options: Options): Package =
   result = pkg
   # Resolve alias.
   if pkg.alias.len > 0:
-    display("Warning:", "The $1 package has been renamed to $2" %
-            [pkg.name, pkg.alias], Warning, HighPriority)
+    warn("The $1 package has been renamed to $2" % [pkg.name, pkg.alias])
     if not getPackage(pkg.alias, options, result):
       raise nimbleError("Alias for package not found: " &
                          pkg.alias)

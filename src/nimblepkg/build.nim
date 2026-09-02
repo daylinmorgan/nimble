@@ -123,8 +123,7 @@ proc buildFromDir*(pkgInfo: PackageInfo, paths: HashSet[string],
     if dirExists(outputDir):
       if fileExists(outputDir / bin):
         if not pkgInfo.needsRebuild(outputDir / bin, realDir, options):
-          display("Skipping", "$1/$2 (up-to-date)" %
-                  [pkginfo.basicInfo.name, bin], priority = HighPriority)
+          notice "Skipping  $1/$2 (up-to-date)" % [pkginfo.basicInfo.name, bin]
           binariesBuilt.inc()
           continue
     else:
@@ -144,8 +143,7 @@ proc buildFromDir*(pkgInfo: PackageInfo, paths: HashSet[string],
         # Check if the source binary is up-to-date
         if not pkgInfo.needsRebuild(sourceBinary, realDir, options):
           let targetBinary = outputDir / bin
-          display("Skipping", "$1/$2 (up-to-date)" %
-                  [pkginfo.basicInfo.name, bin], priority = HighPriority)
+          notice "Skipping $1/$2 (up-to-date)" % [pkginfo.basicInfo.name, bin]
           copyFile(sourceBinary, targetBinary)
           when not defined(windows):
             # Preserve executable permissions
@@ -154,8 +152,7 @@ proc buildFromDir*(pkgInfo: PackageInfo, paths: HashSet[string],
           continue
 
     let outputOpt = "-o:" & pkgInfo.getOutputDir(bin).quoteShell
-    display("Building", "$1/$2 using $3 backend" %
-            [pkginfo.basicInfo.name, bin, pkgInfo.backend], priority = HighPriority)
+    notice "Building $1/$2 using $3 backend" % [pkginfo.basicInfo.name, bin, pkgInfo.backend]
 
     # For installed packages, we need to handle srcDir correctly
     let input =

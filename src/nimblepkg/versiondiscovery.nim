@@ -115,7 +115,7 @@ proc readTaggedVersionsCache*(options: Options): TaggedVersionsCache =
     try:
       result = cacheFile.readFile.parseJson().to(TaggedVersionsCache)
     except CatchableError as e:
-      displayWarning(&"Error reading tagged versions cache: {e.msg}", HighPriority)
+      warn &"Error reading tagged versions cache: {e.msg}"
       result = initTable[string, seq[PackageMinimalInfo]]()
   else:
     result = initTable[string, seq[PackageMinimalInfo]]()
@@ -130,7 +130,7 @@ proc writeTaggedVersionsCache*(cache: TaggedVersionsCache, options: Options) =
     {.cast(raises: [CatchableError]).}:
       moveFile(tempFile, cacheFile)  # Atomic rename
   except CatchableError as e:
-    displayWarning(&"Error saving tagged versions cache: {e.msg}", HighPriority)
+    warn &"Error saving tagged versions cache: {e.msg}"
     try:
       removeFile(tempFile)
     except:
@@ -247,17 +247,17 @@ proc getPackageMinimalVersionsFromRepo*(
       tags = (await getTagsListAsync(gitRoot, downloadMethod)).getVersionList()
     except ref NimbleGitError as e:
       options.satResult.gitErrors.add(&"Git error fetching tags for {name} (could be a network issue): {e.msg}")
-      displayWarning(&"Git error fetching tags for {name}: {e.msg}", HighPriority)
+      warn &"Git error fetching tags for {name}: {e.msg}"
       return
     except CatchableError as e:
-      displayWarning(&"Error fetching tags for {name}: {e.msg}", HighPriority)
+      warn &"Error fetching tags for {name}: {e.msg}"
       return
 
     # Get current HEAD version info (files already on disk)
     try:
       result.add getPkgInfo(repoDir, options, nimBin).getMinimalInfo(options)
     except CatchableError as e:
-      displayWarning(&"Error getting package info for {name}: {e.msg}", HighPriority)
+      warn &"Error getting package info for {name}: {e.msg}"
 
     # Process each tag - read nimble file directly from git
     for (ver, tag) in tags.pairs:
@@ -265,7 +265,7 @@ proc getPackageMinimalVersionsFromRepo*(
         # List nimble files in this tag
         let nimbleFiles = await gitListNimbleFilesInCommitAsync(gitRoot, tag)
         if nimbleFiles.len == 0:
-          displayInfo(&"No nimble file found in tag {tag} for {name}", LowPriority)
+          debug &"No nimble file found in tag {tag} for {name}"
           continue
 
         # Filter nimble files to those in the subdirectory (if applicable)
@@ -278,7 +278,7 @@ proc getPackageMinimalVersionsFromRepo*(
           relevantNimbleFiles = nimbleFiles
 
         if relevantNimbleFiles.len == 0:
-          displayInfo(&"No nimble file found in tag {tag} (subdir: {subdirPath}) for {name}", LowPriority)
+          debug &"No nimble file found in tag {tag} (subdir: {subdirPath}) for {name}"
           continue
 
         # Prefer nimble file matching package name
@@ -309,13 +309,13 @@ proc getPackageMinimalVersionsFromRepo*(
             except: discard
 
       except CatchableError as e:
-        displayInfo(&"Error reading tag {tag} for {name}: {e.msg}", LowPriority)
+        debug &"Error reading tag {tag} for {name}: {e.msg}"
 
     # Save to cache
     try:
       saveTaggedVersions(name, result, options)
     except CatchableError as e:
-      displayWarning(&"Error saving tagged versions for {name}: {e.msg}", LowPriority)
+      warn &"Error saving tagged versions for {name}: {e.msg}"
 
 proc downloadNimSpecialVersion*(
     pv: PkgTuple, options: Options
@@ -594,7 +594,7 @@ proc processRequirements*(pv: PkgTuple, visitedParam: HashSet[PkgTuple], getMini
         for req in pkgMin.requires:
           if req.name in failedReqs:
             allRequirementsValid = false
-            displayWarning(&"Skipping package {pkgMin.name}@{pkgMin.version} due to invalid dependency: {req.name}", HighPriority)
+            warn &"Skipping package {pkgMin.name}@{pkgMin.version} due to invalid dependency: {req.name}"
             break
         if allRequirementsValid:
           validPkgMins.add pkgMin
@@ -632,7 +632,7 @@ proc processRequirements*(pv: PkgTuple, visitedParam: HashSet[PkgTuple], getMini
     except CatchableError as e:
       # Some old packages may have invalid requirements (i.e repos that doesn't exist anymore)
       # we need to avoid adding it to the package table as this will cause the solver to fail
-      displayWarning(&"Error processing requirements for {pv.name}: {e.msg}", HighPriority)
+      warn &"Error processing requirements for {pv.name}: {e.msg}"
 
 proc collectAllVersions*(package: PackageMinimalInfo, options: Options, getMinimalPackage: GetPackageMinimal, preferredPackages: seq[PackageMinimalInfo] = newSeq[PackageMinimalInfo](), nimBin: Option[string]): Future[TableRef[string, PackageVersions]] {.async.} =
   {.cast(raises: [CatchableError]).}:

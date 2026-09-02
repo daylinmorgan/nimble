@@ -27,7 +27,7 @@ proc updateSubmodules*(dir: string) =
   let (output, exitCode) = doCmdEx(
     &"git -C {dir.quoteShell} submodule update --init --recursive --depth 1")
   if exitCode != QuitSuccess:
-    displayWarning("Failed to update submodules in " & dir &
+    warn("Failed to update submodules in " & dir &
       ". This may cause issues if the package relies on submodules.\n" &
       "Details: " & output)
 
@@ -314,7 +314,7 @@ proc cloneSpecificRevision(downloadMethod: DownloadMethod,
                            vcsRevision: Sha1Hash, options: Options) =
   assert vcsRevision != notSetSha1Hash
 
-  display("Cloning", "revision: " & $vcsRevision, priority = MediumPriority)
+  info "Cloning revision: " & $vcsRevision
   case downloadMethod
   of DownloadMethod.git:
     createDir(downloadDir)
@@ -335,7 +335,7 @@ proc cloneSpecificRevisionAsync*(downloadMethod: DownloadMethod,
   ## Async version of cloneSpecificRevision that uses doCmdExAsync for non-blocking execution.
   assert vcsRevision != notSetSha1Hash
 
-  display("Cloning", "revision: " & $vcsRevision, priority = MediumPriority)
+  info "Cloning revision: " & $vcsRevision
   case downloadMethod
   of DownloadMethod.git:
     createDir(downloadDir)
@@ -462,7 +462,7 @@ proc sendWithRedirect*(request: HttpClientRequestRef): Future[HttpClientResponse
       result = await request.send()
 
 proc retrieveUrl*(url: string, disableSslCertCheck = false): Future[string] {.async.} =
-  display("Http", "Requesting " & url, priority = DebugPriority)
+  debug "Requesting " & url
   let flags = if disableSslCertCheck:
     {HttpClientFlag.NoVerifyHost, HttpClientFlag.NoVerifyServerName}
   else: {}
@@ -493,7 +493,7 @@ proc getFullRevisionFromGitHubApi(url, version: string): Future[Sha1Hash] {.asyn
   ## the full hash of the commit by using GitHub REST API.
   try:
     let gitHubApiUrl = getGitHubApiUrl(url, version)
-    display("Get", gitHubApiUrl);
+    debug "Get", gitHubApiUrl
     let content = await retrieveUrl(gitHubApiUrl)
     let json = parseJson(content)
     if json.hasKey("sha"):
@@ -558,17 +558,17 @@ proc doDownloadTarball(url, downloadDir, version: string, queryRevision: bool):
   ## downloaded package in the case `queryRevision` is `true`.
 
   let downloadLink = getTarballDownloadLink(url, version)
-  display("Downloading", downloadLink)
+  notice "Downloading ", downloadLink
   let data = waitFor retrieveUrl(downloadLink)
-  display("Completed", "downloading " & downloadLink)
+  notice "Completed downloading " & downloadLink
 
   let filePath = downloadDir / "tarball.tar.gz"
-  display("Saving", filePath)
+  notice "Saving ", filePath
   downloadDir.createDir
   writeFile(filePath, data)
-  display("Completed", "saving " & filePath)
+  notice "Completed saving " & filePath
 
-  display("Unpacking", filePath)
+  notice "Unpacking ", filePath
   let cmd = getTarCmdLine(downloadDir, filePath)
   let (output, exitCode) = doCmdEx(cmd)
   if exitCode != QuitSuccess and not output.contains("Cannot create symlink to"):
@@ -578,7 +578,7 @@ proc doDownloadTarball(url, downloadDir, version: string, queryRevision: bool):
     # unpack time. If this error occurs the files were previously extracted
     # successfully and it should not be treated as error.
     raise nimbleError(tryDoCmdExErrorMessage(cmd, output, exitCode))
-  display("Completed", "unpacking " & filePath)
+  notice "Completed unpacking " & filePath
 
   when defined(windows):
     # On Windows symbolic link files are not being extracted properly by the
@@ -606,22 +606,22 @@ proc doDownloadTarballAsync*(url, downloadDir, version: string, queryRevision: b
   ## Async version of doDownloadTarball that uses doCmdExAsync for tar extraction.
   ## Note: HTTP download is still synchronous, but tar extraction is async.
   let downloadLink = getTarballDownloadLink(url, version)
-  display("Downloading", downloadLink)
+  notice "Downloading ", downloadLink
   let data = await retrieveUrl(downloadLink)
-  display("Completed", "downloading " & downloadLink)
+  notice "Completed downloading " & downloadLink
 
   let filePath = downloadDir / "tarball.tar.gz"
-  display("Saving", filePath)
+  notice "Saving ", filePath
   downloadDir.createDir
   writeFile(filePath, data)
-  display("Completed", "saving " & filePath)
+  notice "Completed saving " & filePath
 
-  display("Unpacking", filePath)
+  notice "Unpacking ", filePath
   let cmd = getTarCmdLine(downloadDir, filePath)
   let (output, exitCode) = await doCmdExAsync(cmd)
   if exitCode != QuitSuccess and not output.contains("Cannot create symlink to"):
     raise nimbleError(tryDoCmdExErrorMessage(cmd, output, exitCode))
-  display("Completed", "unpacking " & filePath)
+  notice "Completed unpacking " & filePath
 
   when defined(windows):
     let listCmd = &"{getTarExePath()} -ztvf {filePath} --force-local"
@@ -712,13 +712,12 @@ proc doDownload(url, downloadDir: string, verRange: VersionRange,
             result.vcsRevision = doDownloadTarball(
               url, downloadDir, versionToDownload, true)
           else:
-            display("Cloning", "latest tagged version: " & latest.tag,
-                    priority = MediumPriority)
+            info "Cloning latest tagged version: " & latest.tag
             doClone(downMethod, url, downloadDir, latest.tag,
                     onlyTip = not options.forceFullClone, options = options)
       else:
-        display("Warning:", &"The package {url} has no tagged releases, downloading HEAD instead.", Warning,
-                priority = HighPriority)
+        warn &"The package {url} has no tagged releases, downloading HEAD instead."
+
         if downloadTarball(url, options):
           result.vcsRevision = doDownloadTarball(url, downloadDir, "HEAD", true)
         else:
@@ -732,12 +731,10 @@ proc doDownload(url, downloadDir: string, verRange: VersionRange,
 
       if versions.len > 0:
         getLatestByTag:
-          display("Switching", "to latest tagged version: " & latest.tag,
-                  priority = MediumPriority)
+          info "Switching to latest tagged version: " & latest.tag
           discard doCheckout(downMethod, downloadDir, latest.tag, options = options)
       else:
-        display("Warning:", &"The package {url} has no tagged releases, downloading HEAD instead.", Warning,
-                  priority = HighPriority)
+        warn &"The package {url} has no tagged releases, downloading HEAD instead."
 
   if result.vcsRevision == notSetSha1Hash:
     # In the case the package in not downloaded as tarball we must query its
@@ -814,13 +811,11 @@ proc doDownloadAsync(url, downloadDir: string, verRange: VersionRange,
             result.vcsRevision = await doDownloadTarballAsync(
               url, downloadDir, versionToDownload, true)
           else:
-            display("Cloning", "latest tagged version: " & latest.tag,
-                    priority = MediumPriority)
+            info "Cloning latest tagged version: " & latest.tag
             await doCloneAsync(downMethod, url, downloadDir, latest.tag,
                     onlyTip = not options.forceFullClone, options = options)
       else:
-        display("Warning:", &"The package {url} has no tagged releases, downloading HEAD instead.", Warning,
-                priority = HighPriority)
+        warn &"The package {url} has no tagged releases, downloading HEAD instead."
         if downloadTarball(url, options):
           result.vcsRevision = await doDownloadTarballAsync(url, downloadDir, "HEAD", true)
         else:
@@ -834,12 +829,10 @@ proc doDownloadAsync(url, downloadDir: string, verRange: VersionRange,
 
       if versions.len > 0:
         getLatestByTag:
-          display("Switching", "to latest tagged version: " & latest.tag,
-                  priority = MediumPriority)
+          info "Switching to latest tagged version: " & latest.tag
           discard doCheckout(downMethod, downloadDir, latest.tag, options = options)
       else:
-        display("Warning:", &"The package {url} has no tagged releases, downloading HEAD instead.", Warning,
-                  priority = HighPriority)
+        warn &"The package {url} has no tagged releases, downloading HEAD instead."
 
   if result.vcsRevision == notSetSha1Hash:
     # In the case the package in not downloaded as tarball we must query its
@@ -884,9 +877,7 @@ proc isCacheValid(pkgDir, downloadDir, downloadPath: string,
     let nimbleFile = findNimbleFile(pkgDir, error = false, options, warn = false)
     let cachedInfo = extractRequiresInfo(nimbleFile, options)
     if cachedInfo.version != "" and newVersion(cachedInfo.version) notin verRange:
-      display("Info", "Cached version " & cachedInfo.version &
-        " doesn't match requested " & $verRange & ", re-downloading",
-        priority = HighPriority)
+      notice "Cached version " & cachedInfo.version & " doesn't match requested " & $verRange & ", re-downloading"
       removeDir(downloadDir)
       createDir(downloadDir)
       return false
@@ -949,16 +940,13 @@ proc downloadPkg*(url: string, verRange: VersionRange,
   let verStr = if verRange.kind == verAny: "" else: " (" & $verRange & ")"
   let category = if options.satResult.pass != satDone: "Fetching" else: "Downloading"
   if subdir.len > 0:
-    display(category, "$1$2 using $3 (subdir is '$4')" %
-                           [modUrl, verStr, downloadMethod, subdir],
-            priority = HighPriority)
+    notice category,  " $1$2 using $3 (subdir is '$4')" % [modUrl, verStr, downloadMethod, subdir]
   else:
-    display(category, "$1$2 using $3" % [modUrl, verStr, downloadMethod],
-            priority = HighPriority)
+    notice category, " $1$2 using $3" % [modUrl, verStr, downloadMethod]
 
   (result.version, result.vcsRevision) = doDownload(
     modUrl, downloadDir, verRange, downMethod, options, vcsRevision)
-  
+
   var metaData = initPackageMetaData()
   metaData.url = modUrl
   metaData.vcsRevision = result.vcsRevision
@@ -1017,12 +1005,9 @@ proc downloadPkgAsync*(url: string, verRange: VersionRange,
   let verStr = if verRange.kind == verAny: "" else: " (" & $verRange & ")"
   let category = if options.satResult.pass != satDone: "Fetching" else: "Downloading"
   if subdir.len > 0:
-    display(category, "$1$2 using $3 (subdir is '$4')" %
-                           [modUrl, verStr, downloadMethod, subdir],
-            priority = HighPriority)
+    notice category, " $1$2 using $3 (subdir is '$4')" % [modUrl, verStr, downloadMethod, subdir]
   else:
-    display(category, "$1$2 using $3" % [modUrl, verStr, downloadMethod],
-            priority = HighPriority)
+    notice category, " $1$2 using $3" % [modUrl, verStr, downloadMethod]
 
   (result.version, result.vcsRevision) = await doDownloadAsync(
     modUrl, downloadDir, verRange, downMethod, options, vcsRevision)
@@ -1067,9 +1052,8 @@ proc echoPackageVersions*(pkg: Package,
                         "(No tagged versions match " & $verRange & ")")
       else:
         displayInfoLine("  versions:    ", "(No versions tagged in the remote repository)")
-    except CatchableError:
-      displayFormatted(DisplayType.Error, "  Error: ")
-      displayFormatted(DisplayType.Error, getCurrentExceptionMsg())
+    except CatchableError as e:
+      error e
       displayFormatted(Hint, "\n")
   of DownloadMethod.hg:
     displayInfoLine("  versions:    ", "(Remote tag retrieval not supported by " &

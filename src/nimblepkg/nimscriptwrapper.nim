@@ -36,7 +36,7 @@ proc writeExecutionOutput(data: string) =
   # TODO: in the future we will likely want this to be live, users will
   # undoubtedly be doing loops and other crazy things in their top-level
   # Nimble files.
-  display("Info", data)
+  notice data
 
 proc getNimblecache(): string =
   getTempDir() / "nimblecache-" & $getEnv("USER").hash().abs()
@@ -78,7 +78,7 @@ proc execNimscript(nimBin: Option[string],
       cmd &= " " & i.quoteShell()
     cmd &= " " & join(options.action.custRunFlags, " ")
 
-  displayDebug("Executing", cmd)
+  debug "Executing: ", cmd
 
   if needsLiveOutput(actionName, options, isHook):
     result.exitCode = execCmd(cmd)
@@ -151,7 +151,8 @@ proc getIniFile*(scriptName: string, options: Options, nimBin: Option[string]): 
 
     if exitCode == 0 and output.len != 0:
       result.writeFile(output)
-      stdout.writeExecutionOutput()
+      if stdout != "":
+        stdout.writeExecutionOutput()
     else:
       raise nimbleError(stdout & "\nprintPkgInfo() failed")
 
@@ -203,9 +204,7 @@ proc execTask*(nimBin: Option[string], scriptName, taskName: string,
   ## Executes the specified task in the specified script.
   ##
   ## `scriptName` should be a filename pointing to the nimscript file.
-  display("Executing",  "task $# in $#" % [taskName, scriptName],
-          priority = HighPriority)
-
+  notice "Executing: task $# in $#" % [taskName, scriptName]
   result = execScript(nimBin, scriptName, taskName, options, isHook=false)
 
 proc execHook*(nimBin: Option[string], scriptName, actionName: string, before: bool,
@@ -217,9 +216,7 @@ proc execHook*(nimBin: Option[string], scriptName, actionName: string, before: b
   let hookName =
     if before: actionName.toLowerAscii & "Before"
     else: actionName.toLowerAscii & "After"
-  display("Attempting", "to execute hook $# in $#" % [hookName, scriptName],
-          priority = MediumPriority)
-
+  info "Attempting to execute hook $# in $#" % [hookName, scriptName]
   result = execScript(nimBin, scriptName, hookName, options, isHook=true)
 
 proc hasTaskRequestedCommand*(execResult: ExecutionResult): bool =

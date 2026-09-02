@@ -31,11 +31,9 @@ proc setupBinSymlink*(symlinkDest, symlinkFilename: string,
     currentPerms = getFilePermissions(symlinkDest)
   setFilePermissions(symlinkDest, currentPerms + {fpUserExec})
   when defined(unix):
-    display("Creating", "symlink: $1 -> $2" %
-            [symlinkDest, symlinkFilename], priority = MediumPriority)
+    info "Creating symlink: $1 -> $2" % [symlinkDest, symlinkFilename]
     if fileExists(symlinkFilename) or symlinkExists(symlinkFilename):
-      let msg = "Symlink already exists in $1. Replacing." % symlinkFilename
-      display("Warning:", msg, Warning, HighPriority)
+      warn "Symlink already exists in $1. Replacing." % symlinkFilename
       removeFile(symlinkFilename)
 
     createSymlink(symlinkDestRel, symlinkFilename)
@@ -53,8 +51,7 @@ proc setupBinSymlink*(symlinkDest, symlinkFilename: string,
 
     # Create cmd.exe/powershell stub.
     let dest = symlinkFilename.changeFileExt("cmd")
-    display("Creating", "stub: $1 -> $2" % [symlinkDest, dest],
-            priority = MediumPriority)
+    info "Creating stub: $1 -> $2" % [symlinkDest, dest]
     var contents = "@"
     if options.config.chcp:
       if fixChcp:
@@ -72,8 +69,7 @@ proc setupBinSymlink*(symlinkDest, symlinkFilename: string,
     result.add dest.extractFilename
     # For bash on Windows (Cygwin/Git bash).
     let bashDest = dest.changeFileExt("")
-    display("Creating", "Cygwin stub: $1 -> $2" %
-            [symlinkDest, bashDest], priority = MediumPriority)
+    info "Creating Cygwin stub: $1 -> $2" % [symlinkDest, bashDest]
     if symlinkDestRel.isAbsolute:
       # Cross-drive case: use absolute path directly
       writeFile(bashDest, "\"" & symlinkDest & "\" \"$@\"\n")

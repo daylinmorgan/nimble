@@ -33,35 +33,37 @@ proc doCmd*(cmd: string) =
   if isNim:
     # Show no command line and --hints:off output by default for calls
     # to Nim, command line and standard output with --verbose.
-    display("Executing", cmd, priority = MediumPriority)
+    info "Executing: ", cmd
     let (output, exitCode) = execCmdEx(cmd)
-    display("Nim Output", output, priority = HighPriority)
+    notice "Nim Output", output
+
     if exitCode != QuitSuccess:
       raise nimbleError(
         "Execution failed with exit code $1\nCommand: $2" %
         [$exitCode, cmd])
   else:
-    displayDebug("Executing", cmd)
+    debug "Executing: ", cmd
     let (output, exitCode) = execCmdEx(cmd)
-    displayDebug("Output", output)
+    debug "Output: ", output
     if exitCode != QuitSuccess:
       raise nimbleError(
         "Execution failed with exit code $1\nCommand: $2\nOutput: $3" %
         [$exitCode, cmd, output])
 
 proc doCmdEx*(cmd: string): ProcessOutput =
-  displayDebug("Executing", cmd)
+  debug "Executing: ", cmd
   result = execCmdEx(cmd)
-  displayDebug("Output", result.output)
+  debug "Output: ", result.output
 
 proc doCmdExAsync*(cmd: string): Future[ProcessOutput] {.async.} =
   let bin = extractBin(cmd)
   if findExe(bin) == "":
     raise nimbleError("'" & bin & "' not in PATH.")
-  displayDebug("Executing", cmd)
+
+  debug "Executing: ", cmd
   let res = await execCommandEx(cmd)
   result = (res.stdOutput, res.status)
-  displayDebug("Output", result.output)
+  debug "Output: ", result.output
 
 proc gitShowFile*(repoDir: string, commitish: string, filePath: string): string =
   ## Reads file content directly from git object database without checkout (sync version).
@@ -171,20 +173,20 @@ proc changeRoot*(origRoot, newRoot, path: string): string =
 
 proc copyFileD*(fro, to: string): string =
   ## Returns the destination (``to``).
-  display("Copying", "file $# to $#" % [fro, to], priority = LowPriority)
+  debug &"Copying file {fro} to {to}"
   copyFileWithPermissions(fro, to)
   result = to
 
 proc copyDirD*(fro, to: string): seq[string] =
   ## Returns the filenames of the files in the directory that were copied.
   result = @[]
-  display("Copying", "directory $# to $#" % [fro, to], priority = LowPriority)
+  debug &"Copying file ${fro} to ${to}"
   for path in walkDirRec(fro):
     createDir(changeRoot(fro, to, path.splitFile.dir))
     result.add copyFileD(path, changeRoot(fro, to, path))
 
 proc createDirD*(dir: string) =
-  display("Creating", "directory $#" % dir, priority = LowPriority)
+  debug "Creating directory ",dir
   createDir(dir)
 
 proc getDownloadDirName*(uri: string, verRange: VersionRange,
@@ -280,11 +282,9 @@ proc removePackageDir*(files: seq[string], dir: string, reportSuccess = false) =
   if dir.isEmptyDir():
     removeDir(dir)
     if reportSuccess:
-      displaySuccess(&"The directory \"{dir}\" has been removed.",
-                     MediumPriority)
+      notice &"The directory \"{dir}\" has been removed."
   else:
-    displayWarning(
-      &"Cannot completely remove the directory \"{dir}\".\n" &
+    warn (&"Cannot completely remove the directory \"{dir}\".\n" &
        "Files not installed by Nimble are present.")
 
 when defined(instrument):

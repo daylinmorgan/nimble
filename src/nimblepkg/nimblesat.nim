@@ -806,8 +806,8 @@ proc normalizeSpecialVersions*(pkgVersionTable: var Table[string, PackageVersion
       pkgVersions.versions = pkgVersions.versions.filterIt(
         not it.version.isSpecial or it.version == winner
       )
-      displayWarning(&"Multiple dependencies require different special versions of '{pkgName}': " &
-        &"using {winner}, ignoring {others}. This will become an error in future versions.", HighPriority)
+      warn(&"Multiple dependencies require different special versions of '{pkgName}': " &
+        &"using {winner}, ignoring {others}. This will become an error in future versions.")
 
   # Phase 2: remove URL-keyed table entries for packages that have a winner
   # and fix normalizedRequirements so it points to the correct URL
@@ -1014,7 +1014,6 @@ proc solvePackages*(rootPkg: PackageInfo, pkgList: seq[PackageInfo], pkgsToInsta
           result.incl pkgInfo
           foundInList = true
     if not foundInList:
-      # displayInfo(&"Coudlnt find {solvedPkg.pkgName}", priority = HighPriority)
       if solvedPkg.pkgName.isNim and systemNimCompatible:
         continue #Skips systemNim
       pkgsToInstall.addUnique((solvedPkg.pkgName, solvedPkg.version))
@@ -1467,7 +1466,7 @@ proc solveLockFileDeps*(satResult: var SATResult, pkgList: seq[PackageInfo], opt
       nimBin
     )
     if satResult.solvedPkgs.len == 0:
-      displayError(satResult.output)
+      error satResult.output
       raise resolutionFailureError(
         "Couldn't find a solution for the packages.")
   elif options.isUpgrade:

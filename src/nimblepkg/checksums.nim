@@ -33,7 +33,7 @@ proc updateSha1Checksum(checksum: var Sha1State, fileName, filePath: string) =
     try:
       linkPath = expandSymlink(filePath)
     except OSError:
-      displayWarning(&"Cannot expand symbolic link \"{filePath}\".\n" &
+      warn(&"Cannot expand symbolic link \"{filePath}\".\n" &
                       "Skipping it in the calculation of the checksum.")
       return
     checksum.update(linkPath)
@@ -46,7 +46,7 @@ proc updateSha1Checksum(checksum: var Sha1State, fileName, filePath: string) =
     except IOError:
       ## If the file cannot be open for reading do not count its content in the
       ## checksum.
-      displayWarning(&"The file \"{filePath}\" cannot be open for reading.\n" &
+      warn(&"The file \"{filePath}\" cannot be open for reading.\n" &
                       "Skipping it in the calculation of the checksum.")
       return
     defer: close(file)

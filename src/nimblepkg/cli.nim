@@ -12,8 +12,18 @@
 #   - Bright for HighPriority.
 #   - Normal for MediumPriority.
 
+# [mapping old style to logging]
+# displayInfo medium -> info
+# displayInfo low -> debug
+# displayInfo high -> notice
+# displaySuccess -> notice
+
+
 import terminal, sets, strutils
 import common
+
+import ./logging
+export logging
 
 type
   CLI* = ref object
@@ -129,47 +139,8 @@ proc display*(category, msg: string, displayType = Message,
     displayLine(if i == 0: category else: "...", line, displayType, priority)
     i.inc
 
-proc displayWarning*(message: string, priority = HighPriority) =
-  display("Warning: ", message, Warning, priority)
-
-proc displayHint*(message: string, priority = HighPriority) =
-  display("Hint: ", message, Hint, priority)
-
-proc displayDetails*(message: string, priority = HighPriority) =
-  display("Details: ", message, Details, priority)
-
-proc displaySuccess*(message: string, priority = HighPriority) =
-  display("Success: ", message, Success, priority)
-
-proc displayError*(message: string,  priority = HighPriority) =
-  display("Error: ", message, Error, priority)
-
-proc displayInfo*(message: string, priority = HighPriority) =
-  display("Info: ", message, Message, priority)
-
-template defineDisplayMethods(displayMethodName: untyped) {.dirty.} =
-  method displayMethodName*(error: ref CatchableError, priority = HighPriority)
-      {.base.} =
-    displayMethodName(error.msg, priority)
-    var errorIt = error
-    if errorIt.parent != nil:
-      displayDetails((ref CatchableError)(errorIt.parent), priority)
-
-  method displayMethodName*(error: ref NimbleError, priority = HighPriority) =
-    procCall (ref CatchableError)(error).displayMethodName(priority)
-    displayHint(error.hint, priority)
-
-defineDisplayMethods(displayDetails)
-defineDisplayMethods(displayError)
-defineDisplayMethods(displayWarning)
-
-proc displayDebug*(category, msg: string) =
-  ## Convenience for displaying debug messages.
-  display(category, msg, priority = DebugPriority)
-
-proc displayDebug*(msg: string) =
-  ## Convenience for displaying debug messages with a default category.
-  displayDebug("Debug:", msg)
+# proc displayInfo*(message: string, priority = HighPriority) {.deprecated.} =
+#   info message
 
 proc prompt*(forcePrompts: ForcePrompt, question: string): bool =
   case forcePrompts
@@ -314,10 +285,21 @@ proc promptList*(forcePrompts: ForcePrompt, question: string, args: openarray[st
       return promptListFallback(question, args)
 
 proc setVerbosity*(level: Priority) =
+  case level:
+  of DebugPriority:
+    consoleLogger.levelThreshold = lvlAll
+  of LowPriority, MediumPriority:
+    consoleLogger.levelThreshold = lvlInfo
+  else:
+    consoleLogger.levelThreshold = lvlNotice
+
   getGlobalCLI().level = level
 
 proc setShowColor*(val: bool) =
   getGlobalCLI().showColor = val
+  consoleLogger.showColor = val
 
 proc setSuppressMessages*(val: bool) =
   getGlobalCLI().suppressMessages = val
+  consoleLogger.levelThreshold = lvlNone
+

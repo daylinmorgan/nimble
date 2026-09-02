@@ -180,7 +180,7 @@ proc getLatestCommit*(repo, branch: string): string =
         result = line.split('\t')[0]
         break
     else:
-      display("Warning", outp & "\ngit ls-remote failed", Warning, HighPriority)
+      warn "Warning", outp & "\ngit ls-remote failed"
 
 proc doCmdRaw*(cmd: string) =
   var command = cmd
@@ -191,11 +191,11 @@ proc doCmdRaw*(cmd: string) =
   if defined(macosx) and isRosetta():
     command = "arch -arm64 " & command
 
-  displayDebug("Executing", command)
-  displayDebug("Work Dir", getCurrentDir())
+  debug "Executing: ", command
+  debug "Work Dir: ", getCurrentDir()
   let (output, exitCode) = execCmdEx(command)
-  displayDebug("Finished", "with exit code " & $exitCode)
-  displayDebug("Output", output)
+  debug "Finished", "with exit code " & $exitCode
+  debug "Output: ", output
 
   if exitCode != QuitSuccess:
     raise newException(
@@ -254,7 +254,7 @@ when defined(curl):
       raise newException(AssertionError, "CURL failed: " & $easy_strerror(code))
 
   proc downloadFileCurl(url, outputPath: string) =
-    displayDebug("Downloading using Curl")
+    debug "Downloading using Curl"
     # Based on: https://curl.haxx.se/libcurl/c/url2file.html
     let curl = libcurl.easy_init()
     defer:
@@ -371,7 +371,7 @@ proc finish(tracker: var ProgressTracker) =
     echo ""
 
 proc downloadFileNim(url, outputPath: string, disableSslCertCheck = false) {.async.} =
-  displayDebug("Downloading using Chronos")
+  debug "Downloading using Chronos"
   let flags = if disableSslCertCheck:
     {HttpClientFlag.NoVerifyHost, HttpClientFlag.NoVerifyServerName}
   else: {}
@@ -430,7 +430,7 @@ proc downloadFileNim(url, outputPath: string, disableSslCertCheck = false) {.asy
 
 proc downloadFile*(url, outputPath: string, disableSslCertCheck = false) {.async.} =
   # For debugging.
-  display("GET:", url, priority = DebugPriority)
+  debug "GET: ", url
 
   # Create outputPath's directory if it doesn't exist already.
   createDir(outputPath.splitFile.dir)
@@ -444,7 +444,7 @@ proc downloadFile*(url, outputPath: string, disableSslCertCheck = false) {.async
     let msg =
       "Couldn't download file from $1.\nResponse was: $2" %
       [url, getCurrentExceptionMsg()]
-    display("Info:", msg, Warning, MediumPriority)
+    warn msg
     if tempOutputPath.fileExists: removeFile(tempOutputPath)
     raise exc
 
@@ -466,7 +466,7 @@ proc needsDownload(
   outputPath = getDownloadPath(downloadUrl, options)
   if outputPath.fileExists():
     # TODO: Verify sha256.
-    display("Info:", "$1 already downloaded" % outputPath, priority = HighPriority)
+    notice "$1 already downloaded" % outputPath
     return false
 
 proc getBinaryUrlFromReleases*(version: Version, arch: int, disableSslCertCheck = false): Future[Option[string]] {.async.} =
@@ -527,7 +527,7 @@ proc canExtractNimXz*(): bool =
 
 proc downloadImpl(version: Version, options: Options): Future[string] {.async.} =
   let arch = getGccArch(options)
-  displayDebug("Detected", "arch as " & $arch & "bit")
+  debug "Detected arch as ", arch, " bit"
   if version.isSpecial():
     var reference, url = ""
     if $version in ["#devel", "#head"]: # and not params.latest:
@@ -537,19 +537,12 @@ proc downloadImpl(version: Version, options: Options): Future[string] {.async.} 
         let parsedContents = parseJson(rawContents)
         (url, reference) = getNightliesUrl(parsedContents, arch)
         if url.len == 0:
-          display(
-            "Warning",
-            "Recent nightly release not found, installing latest devel commit.",
-            Warning, HighPriority,
-          )
+          warn "Recent nightly release not found, installing latest devel commit."
         reference = if reference.len == 0: "devel" else: reference
       except HttpRequestError:
         # Unable to get nightlies release json from github API, fallback
         # to `choosenim devel --latest`
-        display(
-          "Warning", "Nightlies build unavailable, building latest commit", Warning,
-          HighPriority,
-        )
+        warn "Nightlies build unavailable, building latest commit"
 
     if url.len == 0:
       let
@@ -562,8 +555,8 @@ proc downloadImpl(version: Version, options: Options): Future[string] {.async.} 
         else:
           ($version)[1 .. ^1]
       url = $(parseUri(githubUrl) / (dlArchive % reference))
-    display(
-      "Downloading", "Nim $1 from $2" % [reference, "GitHub"], priority = HighPriority
+    notice(
+      "Downloading Nim $1 from $2" % [reference, "GitHub"]
     )
     var outputPath: string
     if not needsDownload(url, outputPath, options):
@@ -572,10 +565,8 @@ proc downloadImpl(version: Version, options: Options): Future[string] {.async.} 
     await downloadFile(url, outputPath, options.disableSslCertCheck)
     result = outputPath
   else:
-    display(
-      "Downloading",
-      "Nim $1 from $2" % [$version, "nim-lang.org"],
-      priority = HighPriority,
+    notice(
+      "Downloading Nim $1 from $2" % [$version, "nim-lang.org"]
     )
 
     var outputPath: string
@@ -595,34 +586,24 @@ proc downloadImpl(version: Version, options: Options): Future[string] {.async.} 
         await downloadFile(binUrl, outputPath, options.disableSslCertCheck)
         return outputPath
       except HttpRequestError:
-        display(
-          "Info:",
-          "Binary download failed, falling back to source",
-          priority = HighPriority,
-        )
+        notice "Binary download failed, falling back to source"
     elif not canXz:
       # No xz decompressor and no libarchive `tar`, so the `.tar.xz` binary is
       # unusable here. Build from source instead of failing. See #1758.
-      display(
-        "Info:",
+      notice(
         "No xz decompressor found (install `xz-utils`/`unxz` for faster binary " &
           "installs); building Nim $1 from source" % $version,
-        priority = HighPriority,
       )
     else:
       # Platform/version not available in releases.json
       when defined(macosx):
-        display(
-          "Info:",
+        notice(
           "Binary build for $1 not available on this platform, building from source" %
             $version,
-          priority = HighPriority,
         )
       else:
-        display(
-          "Info:",
+        notice(
           "Binary build unavailable, building from source",
-          priority = HighPriority,
         )
 
     # Fall back to source tarball. Use `.tar.gz` when we can't decompress xz.
@@ -649,7 +630,7 @@ proc downloadCSources*(options: Options): string =
   if not needsDownload(csourcesArchiveUrl, outputPath, options):
     return outputPath
 
-  display("Downloading", "Nim C sources from GitHub", priority = HighPriority)
+  notice("Downloading Nim C sources from GitHub")
   waitFor downloadFile(csourcesArchiveUrl, outputPath, options.disableSslCertCheck)
   return outputPath
 
@@ -661,7 +642,7 @@ proc downloadMingw*(options: Options): string =
   if not needsDownload(url, outputPath, options):
     return outputPath
 
-  display("Downloading", "C compiler (Mingw$1)" % $arch, priority = HighPriority)
+  notice("Downloading C compiler (Mingw$1)" % $arch)
   waitFor downloadFile(url, outputPath, options.disableSslCertCheck)
   return outputPath
 
@@ -688,9 +669,7 @@ proc getOfficialReleases*(options: Options): Future[seq[Version]] {.async.} =
     let rawContents = await retrieveUrl(releasesJsonUrl, options.disableSslCertCheck)
     parsedContents = parseJson(rawContents)
   except CatchableError:
-    display(
-      "Warning", "Error getting official releases from nim-lang.org", Warning, HighPriority
-    )
+    warn "Error getting official releases from nim-lang.org"
     #Fallback list of known releases when the endpoint is unavailable
     return
       @[
@@ -759,16 +738,11 @@ proc gitUpdate*(version: Version, extractDir: string, options: Options): bool =
       defer:
         setCurrentDir(lastDir)
 
-      display("Fetching", "latest changes", priority = HighPriority)
+      notice("Fetching latest changes")
       for cmd in [" fetch --all", " reset --hard origin/devel"]:
         var (outp, errC) = execCmdEx(git.quoteShell & cmd)
         if errC != QuitSuccess:
-          display(
-            "Warning:",
-            "git" & cmd & " failed: " & outp,
-            Warning,
-            priority = HighPriority,
-          )
+          warn "git" & cmd & " failed: " & outp
           return false
 
 proc gitInit*(version: Version, extractDir: string, options: Options) =
@@ -782,16 +756,11 @@ proc gitInit*(version: Version, extractDir: string, options: Options) =
         setCurrentDir(lastDir)
 
       var init = true
-      display("Setting", "up git repository", priority = HighPriority)
+      notice("Setting up git repository")
       for cmd in [" init", " remote add origin https://github.com/nim-lang/nim"]:
         var (outp, errC) = execCmdEx(git.quoteShell & cmd)
         if errC != QuitSuccess:
-          display(
-            "Warning:",
-            "git" & cmd & " failed: " & outp,
-            Warning,
-            priority = HighPriority,
-          )
+          warn "git" & cmd & " failed: " & outp
           init = false
           break
 
@@ -799,7 +768,7 @@ proc gitInit*(version: Version, extractDir: string, options: Options) =
         discard gitUpdate(version, extractDir, options)
 
 proc extract*(path: string, extractDir: string) =
-  display("Extracting", path.extractFilename(), priority = HighPriority)
+  notice "Extracting ", path.extractFilename()
 
   if path.splitFile().ext == ".xz":
     when defined(windows):
@@ -879,12 +848,7 @@ proc extractNimIfNeeded*(
     return true
   # Dir doesn't exist or is incomplete. Extract from scratch.
   if attempts > 5:
-    display(
-      "Warning",
-      "Failed to extract Nim to $1 after multiple attempts" % extractDir,
-      Warning,
-      HighPriority,
-    )
+    warn "Failed to extract Nim to $1 after multiple attempts" % extractDir
     return false
   removeDir(extractDir)
   extract(path, extractDir)
@@ -912,7 +876,7 @@ proc downloadAndExtractNim*(
     # Check if already properly installed (with working binary)
     let nimBin = extractDir / "bin" / "nim".addFileExt(ExeExt)
     if extractDir.dirExists() and nimBin.fileExists:
-      display("Info:", "Nim $1 already installed" % $version)
+      notice "Nim $1 already installed" % $version
       saveNimMetaData(extractDir)
       return some extractDir
     let path = await downloadNim(version, options)
@@ -921,7 +885,7 @@ proc downloadAndExtractNim*(
       # Compile if no binary exists (e.g., source tarballs from GitHub)
       let nimBin = extractDir / "bin" / "nim".addFileExt(ExeExt)
       if not nimBin.fileExists:
-        display("Info:", "Compiling Nim $1 from source" % $version, priority = HighPriority)
+        notice "Compiling Nim $1 from source" % $version
         await compileNim(options, extractDir, version.toVersionRange)
       saveNimMetaData(extractDir)
       return some extractDir
@@ -930,7 +894,7 @@ proc downloadAndExtractNim*(
   except CatchableError as exc:
     # Surface the underlying reason instead of swallowing it; otherwise the
     # caller only reports the generic "Failed to install nim".
-    displayWarning("Could not download and extract Nim $1: $2" % [$version, exc.msg])
+    warn("Could not download and extract Nim $1: $2" % [$version, exc.msg])
     return none(string)
 
 proc downloadAndExtractNimMatchedVersion*(
@@ -968,7 +932,7 @@ proc installNimFromBinariesDir*(
     if ver.isSome():
       # Don't warn for special versions like #devel - they won't match the binary version
       if not pkg.basicInfo.version.isSpecial and pkg.basicInfo.version != ver.get():
-        displayWarning("Nim binary version doesn't match the package info version for Nim located at: " & pkg.getRealDir)
+        warn("Nim binary version doesn't match the package info version for Nim located at: " & pkg.getRealDir)
       saveNimMetaData(pkg.getRealDir)
       return some (pkg.getRealDir, ver.get())
 
@@ -983,7 +947,7 @@ proc installNimFromBinariesDir*(
         return some (extractedDir.get, ver.get)
 
       # Rebuild if necessary
-      displayInfo "There is no nim binary in the downloaded directory or it is corrupted. Rebuilding it"
+      warn "There is no nim binary in the downloaded directory or it is corrupted. Rebuilding it"
       await compileNim(options, extractedDir.get, require.ver)
       let rebuiltVer = getNimVersion(extractedDir.get)
       if rebuiltVer.isSome():

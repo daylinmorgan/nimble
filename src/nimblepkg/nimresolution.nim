@@ -172,7 +172,7 @@ proc resolveNim*(rootPackage: PackageInfo, pkgListDecl: seq[PackageInfo], system
   options.satResult.pkgs = solvePackagesWithSystemNimFallback(
       rootPackage, pkgListDecl, options,  resolvedNim, nimBin)
   if options.satResult.solvedPkgs.len == 0:
-    displayError(options.satResult.output)
+    error options.satResult.output
     raise resolutionFailureError(
       "Couldnt find a solution for the packages. Unsatisfiable dependencies. Check there is no contradictory dependencies.")
 
@@ -321,7 +321,7 @@ proc resolveAndConfigureNim*(rootPackage: PackageInfo, pkgList: seq[PackageInfo]
     options.satResult.pkgs = solvePackagesWithSystemNimFallback(
         rootPackage, pkgListDecl, options, some(NimResolved(pkg: systemNimPkg, version: systemNimPkg.get.basicInfo.version)), sysNimBin)
     if options.satResult.solvedPkgs.len == 0:
-      displayError(options.satResult.output)
+      error options.satResult.output
       raise resolutionFailureError(
         "Couldnt find a solution for the packages. Unsatisfiable dependencies.")
     return NimResolved(pkg: some(systemNimPkg.get), version: systemNimPkg.get.basicInfo.version)

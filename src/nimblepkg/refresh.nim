@@ -59,8 +59,7 @@ proc refreshDevelopDeps(rootPkg: PackageInfo, options: Options,
     try:
       gitFetchTags(dir, DownloadMethod.git, options)
     except CatchableError as e:
-      displayWarning(&"Could not fetch develop dependency {name} at {dir}: {e.msg}",
-                     HighPriority)
+      warn &"Could not fetch develop dependency {name} at {dir}: {e.msg}"
       continue
     let newest = newestLocalTag(dir, options)
     if newest.isNone or newest.get[0] <= dep.basicInfo.version:
@@ -72,8 +71,7 @@ proc refreshDevelopDeps(rootPkg: PackageInfo, options: Options,
     if doCheckout(DownloadMethod.git, dir, tag, options):
       result.updated.add &"{name} {dep.basicInfo.version} -> {target}"
     else:
-      displayWarning(
-        &"Failed to checkout {name} to version {target} at {dir}.", HighPriority)
+      warn &"Failed to checkout {name} to version {target} at {dir}."
 
 proc newerVersions(names: seq[string],
                    before, after: TaggedVersionsCache): seq[string] =
@@ -91,24 +89,23 @@ proc newerVersions(names: seq[string],
 proc displayRefreshSummary(rootName: string, depNames: seq[string],
                            before, after: TaggedVersionsCache,
                            develop: tuple[updated, skipped: seq[string]]) =
-  display("Refreshed", &"{depNames.len} dependencies of {rootName}",
-          priority = HighPriority)
+  notice &"Refreshed {depNames.len} dependencies of {rootName}"
   let upgrades = newerVersions(depNames, before, after)
 
   if upgrades.len > 0:
-    display("Info:", "Newer versions available:", priority = HighPriority)
+    notice "Newer versions available:\n"
     for line in upgrades:
-      display("", "  " & line, priority = HighPriority)
+      notice " ", line
   if develop.updated.len > 0:
-    display("Info:", "Updated develop dependencies:", priority = HighPriority)
+    notice "Updated develop dependencies:"
     for line in develop.updated:
-      display("", "  " & line, priority = HighPriority)
+      notice " ", line
   if develop.skipped.len > 0:
-    display("Info:", "Skipped (uncommitted changes):", priority = HighPriority)
+    notice "Skipped (uncommitted changes):"
     for line in develop.skipped:
-      display("", "  " & line, priority = HighPriority)
+      notice "  ", line
   if upgrades.len == 0 and develop.updated.len == 0:
-    display("Info:", "Everything is up to date.", priority = HighPriority)
+    notice "Everything is up to date."
 
 proc refreshProjectDeps*(options: var Options, nimBin: var Option[string],
                          solveProject: SolveProjectDeps) =
@@ -162,26 +159,25 @@ proc globalRefreshTargets(options: Options): seq[string] =
 proc displayGlobalRefreshSummary(targets: seq[string],
                                  before, after: TaggedVersionsCache,
                                  outcome: RefreshOutcome) =
-  display("Refreshed", &"{targets.len} global packages", priority = HighPriority)
+  notice &"Refreshed {targets.len} global packages"
   let upgrades = newerVersions(targets, before, after)
   if upgrades.len > 0:
-    display("Info:", "Newer versions available:", priority = HighPriority)
+    notice "Newer versions available:"
     for line in upgrades:
-      display("", "  " & line, priority = HighPriority)
+      notice " ", line
   else:
-    display("Info:", "Everything is up to date.", priority = HighPriority)
+    notice "Everything is up to date."
   # Kept apart from the failures below: nothing went wrong with these, there is
   # just no published package by that name to look at.
   if outcome.unknown.len > 0:
-    display("Info:", &"{outcome.unknown.len} packages are not in any package " &
-            "list and cannot be refreshed:", priority = HighPriority)
+    notice(&"{outcome.unknown.len} packages are not in any package " &
+            "list and cannot be refreshed:")
     for name in outcome.unknown:
-      display("", "  " & name, priority = HighPriority)
+      notice " ", name
   if outcome.failed.len > 0:
-    display("Info:", &"Could not refresh {outcome.failed.len} packages:",
-            priority = HighPriority)
+    notice &"Could not refresh {outcome.failed.len} packages:"
     for line in outcome.failed:
-      display("", "  " & line, priority = HighPriority)
+      notice " ", line
 
 proc fetchRefreshTargets(targets: seq[string], options: Options,
                          nimBin: Option[string]): RefreshOutcome =
@@ -210,8 +206,7 @@ proc fetchRefreshTargets(targets: seq[string], options: Options,
       inc done
       # Reported on completion, so the count still climbs in order even though
       # the packages themselves finish out of order.
-      display("Fetched", &"({done}/{targets.len}) {name}",
-              priority = HighPriority)
+      notice &"Fetched ({done}/{targets.len}) {name}"
 
   let workerCount =
     if options.parallelDiscovery: min(globalRefreshWorkers, targets.len)
@@ -231,13 +226,12 @@ proc refreshGlobalDeps*(options: var Options, nimBin: Option[string]) =
     before = readTaggedVersionsCache(options)
     targets = globalRefreshTargets(options)
   if targets.len == 0:
-    display("Info:", "No global packages to refresh.", priority = HighPriority)
+    notice "No global packages to refresh."
     return
 
   # This walks the network once per package, so say what is about to happen
   # and keep reporting progress rather than going quiet for minutes.
-  display("Refreshing", &"{targets.len} global packages, this may take a while",
-          priority = HighPriority)
+  notice &"Refreshing {targets.len} global packages, this may take a while"
 
   # A nimble file the declarative parser cannot handle falls back to the VM
   # parser, which needs a compiler. Refresh resolves nothing, so nothing has

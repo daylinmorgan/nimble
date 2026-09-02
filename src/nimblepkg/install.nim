@@ -44,7 +44,7 @@ proc displaySatisfiedMsg*(solvedPkgs: seq[SolvedPackage], pkgToInstall: seq[(str
     for pkg in solvedPkgs:
       if pkg.pkgName notin pkgToInstall.mapIt(it[0]):
         for req in pkg.requirements:
-          displayInfo(pkgDepsAlreadySatisfiedMsg(req), MediumPriority)
+          info pkgDepsAlreadySatisfiedMsg(req)
 
 proc displayDevelopDepsMsg*(satResult: SATResult, options: Options) =
   ## Surface develop-linked dependencies so users can confirm the link is active
@@ -53,7 +53,7 @@ proc displayDevelopDepsMsg*(satResult: SATResult, options: Options) =
     if pkg.basicInfo.name == satResult.rootPackage.basicInfo.name: continue
     if pkg.isInDevelopMode(options):
       let srcDir = pkg.myPath.parentDir
-      displayInfo(&"{pkg.basicInfo.name} [develop: {srcDir}]", HighPriority)
+      notice(&"{pkg.basicInfo.name} [develop: {srcDir}]")
 
 proc activateSolvedPkgFeatures*(satResult: SATResult, options: Options) =
   for pkg in satResult.pkgs:
@@ -79,7 +79,7 @@ proc addReverseDeps*(satResult: SATResult, options: Options) =
       except CatchableError:
         # Skip packages that can't be found (e.g., installed during hook execution)
         # This can happen when packages are installed recursively during hooks
-        displayInfo("Skipping reverse dependency for package not found in solution: " & $dep, MediumPriority)
+        info("Skipping reverse dependency for package not found in solution: " & $dep)
 
 proc executeHook(nimBin: Option[string], dir: string, options: var Options, action: ActionType, before: bool) =
   let nimbleFile = findNimbleFile(dir, false, options).splitFile.name
@@ -175,15 +175,13 @@ proc installFromDirDownloadInfo(nimBin: Option[string], downloadDir: string, url
   if pv.ver.kind == verEq and pkgInfo.basicInfo.version != pv.ver.ver:
     pkgInfo.basicInfo.version = pv.ver.ver
 
-  display("Installing", "$1@$2" %
-    [pkgInfo.basicInfo.name, $pkgInfo.basicInfo.version],
-    priority = MediumPriority)
+  info "Installing $1@$2" % [pkgInfo.basicInfo.name, $pkgInfo.basicInfo.version]
 
   let oldPkg = packageExists(nimBin, pkgInfo, options)
   if oldPkg.isSome:
     # In the case we already have the same package in the cache then only merge
     # the new package special versions to the old one.
-    displayWarning(pkgAlreadyExistsInTheCacheMsg(pkgInfo), MediumPriority)
+    warn pkgAlreadyExistsInTheCacheMsg(pkgInfo)
     var oldPkg = oldPkg.get
     # Add the requested version to specialVersions so this package can satisfy
     # requirements for that version (important when same content has multiple version tags)
@@ -217,10 +215,10 @@ proc installFromDirDownloadInfo(nimBin: Option[string], downloadDir: string, url
       workDir = downloadDir
       workPkgInfo = pkgInfo
     else:
-      display("Info:", "Using buildtemp for " & pkgInfo.basicInfo.name &
+      debug("Using buildtemp for " & pkgInfo.basicInfo.name &
               " (binaries: " & $hasBinaries & ", before-install hook: " & $hasPreInstallHook &
               ", submodules: " & $hasSubmodules & ")",
-              priority = LowPriority)
+      )
       buildTempDir = options.getPkgBuildTempDir(
         pkgInfo.basicInfo.name,
         pkgInfo.basicInfo.version.toDirectoryName,
@@ -357,10 +355,10 @@ proc installFromDirDownloadInfo(nimBin: Option[string], downloadDir: string, url
         removeDir(buildTempDir)
 
   else:
-    display("Warning:", "Skipped copy in project local deps mode", Warning)
+    warn "Skipped copy in project local deps mode"
 
   pkgInfo.source = psInstalled
-  displaySuccess(pkgInstalledMsg(pkgInfo.basicInfo.name), MediumPriority)
+  notice(pkgInstalledMsg(pkgInfo.basicInfo.name))
   pkgInfo
 
 proc isRoot(pkgInfo: PackageInfo, satResult: SATResult): bool =
@@ -425,17 +423,17 @@ proc downloadPkgs(entries: var seq[PkgDownloadEntry], options: Options, nimBin: 
     if dirExists(dlInfo.downloadDir) and pkgDirHasNimble(dlInfo.downloadDir, options):
       # Validate cached version matches expected version (issue #1692)
       if not isCacheVersionValid(dlInfo.downloadDir, entries[i].pv.ver, options):
-        displayWarning(&"Cached version doesn't match expected {entries[i].pv.ver} for {entries[i].name}, re-downloading", HighPriority)
+        warn &"Cached version doesn't match expected {entries[i].pv.ver} for {entries[i].name}, re-downloading"
         removeDir(dlInfo.downloadDir)
       else:
         continue
     if dirExists(dlInfo.downloadDir) and not pkgDirHasNimble(dlInfo.downloadDir, options):
-      displayWarning(&"Cache directory is corrupted (no .nimble file found): {dlInfo.downloadDir}", HighPriority)
-      displayWarning("Removing corrupted cache and re-downloading...", HighPriority)
+      warn &"Cache directory is corrupted (no .nimble file found): {dlInfo.downloadDir}"
+      warn "Removing corrupted cache and re-downloading..."
       try:
         removeDir(dlInfo.downloadDir)
       except CatchableError as e:
-        displayWarning(&"Failed to remove corrupted cache: {e.msg}", HighPriority)
+        warn &"Failed to remove corrupted cache: {e.msg}"
 
     if dlInfo.downloadDir in started:
       entries[i].download = started[dlInfo.downloadDir]
